@@ -44,7 +44,7 @@ public:
         }
         return 0;
     }
-    
+
     void dump_results()
     {
           db_->Lock();
@@ -58,6 +58,23 @@ public:
           db_->Unlock();
     }
 
+    void json_dump_results()
+    {
+          db_->Lock();
+          vector<SSDPDBDevice*>devices = db_->GetDevices();
+          std::vector<SSDPDBDevice*>::iterator it;
+          int x = 0;
+          for(it=devices.begin();it<devices.end();it++){
+              if(x==0) printf("{\"result\":[");
+              x++;
+              printf("\n{\"id\":%.3d, \"usn\": \"%s\", \"type\": \"%s\", \"version\": \"%s\", \"location\": \"%s\"}%c",
+              x,((SSDPDBDevice*)*it)->usn.c_str(), ((SSDPDBDevice*)*it)->type.c_str(), ((SSDPDBDevice*)*it)->version.c_str(), ((SSDPDBDevice*)*it)->location.c_str(),
+              it+1==devices.end()?' ':',');
+          }
+          if(x>0) printf("\n]}");
+          db_->Unlock();
+    }
+
 private:
     SSDPDB* db_;
     bool verbose_;
@@ -67,20 +84,26 @@ void usage(char * app)
 {
   std::cout << app << " [-t (default 5)]" << std::endl;
   std::cout << " -t : timeout, print results after listening for (t) seconds, 0 : keep listening and report every update." << std::endl;
+  std::cout << app << " [-j (default false)]" << std::endl;
+  std::cout << " -j :  print results in json format." << std::endl;
 }
 
 
 int main(int argc, char *argv[])
 {
     int timeout = 3;
+    int json_out=0;
     int c;
-    while ( ((c = getopt( argc, argv, "t:?" ) ) ) != -1 )
+    while ( ((c = getopt( argc, argv, "t:?j?" ) ) ) != -1 )
     {
         switch (c)
         {
         case 't':
           timeout = atoi(optarg);
-          break;
+          continue;
+        case 'j':
+          json_out=1;
+          continue;
         case '?':
           default:
         usage(argv[0]);
@@ -95,7 +118,7 @@ int main(int argc, char *argv[])
     db->AddObserver(&mm);
     ssdp->AddObserver(&mm);
     ssdp->Start();
-    
+
     int t = 0;
     while(timeout == 0 || t < timeout){
         ssdp->Search();
@@ -103,7 +126,10 @@ int main(int argc, char *argv[])
         t += 1;
     }
 
-    mm.dump_results();
+    if(json_out > 0)
+     mm.json_dump_results();
+    else
+     mm.dump_results();
 
     delete(ssdp);
 
